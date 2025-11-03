@@ -1,199 +1,102 @@
-import streamlit as st
 import pandas as pd
-import random
+import hashlib
+import math
 from datetime import datetime, timedelta
 
-# -------------------------------------------
-# 🔮 Base Data and Mappings
-# -------------------------------------------
+# --- Deterministic helper functions ---
+
+def deterministic_index(text, mod):
+    """Stable index from text using SHA256 hash."""
+    h = hashlib.sha256(text.encode()).hexdigest()
+    return int(h[:8], 16) % mod
+
+def time_from_angle(angle, base_hour, amplitude):
+    """Generate deterministic time offset (for sunrise/sunset variations)."""
+    minutes = base_hour * 60 + amplitude * math.sin(math.radians(angle))
+    hour = int(minutes // 60)
+    minute = int(minutes % 60)
+    return hour, minute
+
+# --- Planetary datasets ---
+
 planetary_conditions = [
-    "Sun Radiant", "Moon Bright", "Mars Energetic",
-    "Mercury Active", "Jupiter Wise", "Venus Calm", "Saturn Focused"
+    "Sun Radiant", "Moon Serene", "Mars Energetic", "Mercury Active",
+    "Jupiter Wise", "Venus Harmonious", "Saturn Steady", "Rahu Chaotic", "Kethu Subtle"
+]
+
+planetary_combinations = [
+    "MOON/MERCURY/MERCURY", "MOON/MERCURY/KETHU", "MOON/MERCURY/VENUS",
+    "MOON/MERCURY/SUN", "MOON/MERCURY/MOON", "MOON/MERCURY/MARS",
+    "MOON/MERCURY/RAHU", "MOON/MERCURY/JUPITER", "MOON/MERCURY/SATURN",
+    "SUN/KETHU/KETHU", "SUN/KETHU/VENUS", "SUN/KETHU/SUN", "SUN/KETHU/MOON",
+    "SUN/KETHU/MARS", "SUN/KETHU/RAHU", "SUN/KETHU/JUPITER", "SUN/KETHU/SATURN",
+    "SUN/KETHU/MERCURY", "SUN/VENUS/VENUS", "SUN/VENUS/SUN", "SUN/VENUS/MOON",
+    "SUN/VENUS/MARS", "SUN/VENUS/RAHU", "SUN/VENUS/JUPITER", "SUN/VENUS/SATURN",
+    "SUN/VENUS/MERCURY", "SUN/VENUS/KETHU", "SUN/SUN/SUN", "SUN/SUN/MOON",
+    "SUN/SUN/MARS", "SUN/SUN/RAHU"
 ]
 
 recommended_activities = [
-    "Decision-making, teaching, mentoring",
-    "Creative work, music, or writing",
-    "Meditation, mindfulness, self-reflection",
-    "Leadership, presentations, planning",
-    "Research, analysis, and deep work",
-    "Relaxation and family time",
-    "Physical exercise or travel"
+    "Leadership", "Meditation", "Creative work", "Research", "Communication",
+    "Music or writing", "Physical training", "Travel planning", "Finance review"
 ]
 
 level_map = {
-    "⭐": "Poor",
-    "⭐⭐": "Average",
-    "⭐⭐⭐": "Good",
-    "⭐⭐⭐⭐": "Very Good",
-    "⭐⭐⭐⭐⭐": "Excellent"
+    1: "Poor",
+    2: "Average",
+    3: "Good",
+    4: "Very Good",
+    5: "Excellent"
 }
 
-# ✅ Your expanded planetary combinations list
-planetary_combinations = [
-    "MOON/MERCURY/MERCURY", "MOON/MERCURY/KETHU", "MOON/MERCURY/VENUS", "MOON/MERCURY/SUN",
-    "MOON/MERCURY/MOON", "MOON/MERCURY/MARS", "MOON/MERCURY/RAHU", "MOON/MERCURY/JUPITER",
-    "MOON/MERCURY/SATURN", "SUN/KETHU/KETHU", "SUN/KETHU/VENUS", "SUN/KETHU/SUN",
-    "SUN/KETHU/MOON", "SUN/KETHU/MARS", "SUN/KETHU/RAHU", "SUN/KETHU/JUPITER",
-    "SUN/KETHU/SATURN", "SUN/KETHU/MERCURY", "SUN/VENUS/VENUS", "SUN/VENUS/SUN",
-    "SUN/VENUS/MOON", "SUN/VENUS/MARS", "SUN/VENUS/RAHU", "SUN/VENUS/JUPITER",
-    "SUN/VENUS/SATURN", "SUN/VENUS/MERCURY", "SUN/VENUS/KETHU", "SUN/SUN/SUN",
-    "SUN/SUN/MOON", "SUN/SUN/MARS", "SUN/SUN/RAHU", "MERCURY/SUN/RAHU", "MERCURY/SUN/JUPITER",
-    "MERCURY/SUN/SATURN", "MERCURY/SUN/MERCURY", "MERCURY/SUN/KETHU", "MERCURY/SUN/VENUS",
-    "MERCURY/MOON/MOON", "MERCURY/MOON/MARS", "MERCURY/MOON/RAHU", "MERCURY/MOON/JUPITER",
-    "MERCURY/MOON/SATURN", "MERCURY/MOON/MERCURY", "MERCURY/MOON/KETHU", "MERCURY/MOON/VENUS",
-    "MERCURY/MOON/SUN", "MERCURY/MARS/MARS", "MERCURY/MARS/RAHU", "MERCURY/MARS/JUPITER",
-    "MERCURY/MARS/SATURN", "VENUS/MARS/MERCURY", "VENUS/MARS/KETHU", "VENUS/MARS/VENUS",
-    "VENUS/MARS/SUN", "VENUS/MARS/MOON", "VENUS/RAHU/RAHU", "VENUS/RAHU/JUPITER",
-    "VENUS/RAHU/SATURN", "VENUS/RAHU/MERCURY", "VENUS/RAHU/KETHU", "VENUS/RAHU/VENUS",
-    "VENUS/RAHU/SUN", "VENUS/RAHU/MOON", "VENUS/RAHU/MARS", "VENUS/JUPITER/JUPITER",
-    "VENUS/JUPITER/SATURN", "VENUS/JUPITER/MERCURY", "VENUS/JUPITER/KETHU", "VENUS/JUPITER/VENUS",
-    "VENUS/JUPITER/SUN", "VENUS/JUPITER/MOON", "MARS/JUPITER/MOON", "MARS/JUPITER/MARS",
-    "MARS/JUPITER/RAHU", "MARS/SATURN/SATURN", "MARS/SATURN/MERCURY", "MARS/SATURN/KETHU",
-    "MARS/SATURN/VENUS", "MARS/SATURN/SUN", "MARS/SATURN/MOON", "MARS/SATURN/MARS",
-    "MARS/SATURN/RAHU", "MARS/SATURN/JUPITER", "MARS/MERCURY/MERCURY", "MARS/MERCURY/KETHU",
-    "MARS/MERCURY/VENUS", "MARS/MERCURY/SUN", "MARS/MERCURY/MOON", "MARS/MERCURY/MARS",
-    "MARS/MERCURY/RAHU", "MARS/MERCURY/JUPITER", "MARS/MERCURY/SATURN", "JUPITER/KETHU/KETHU",
-    "JUPITER/KETHU/VENUS", "JUPITER/KETHU/SUN", "JUPITER/KETHU/MOON", "JUPITER/KETHU/MARS",
-    "JUPITER/KETHU/RAHU", "JUPITER/KETHU/JUPITER", "JUPITER/KETHU/SATURN", "JUPITER/KETHU/MERCURY",
-    "JUPITER/VENUS/VENUS", "JUPITER/VENUS/SUN", "JUPITER/VENUS/MOON", "JUPITER/VENUS/MARS",
-    "JUPITER/VENUS/RAHU", "JUPITER/VENUS/JUPITER", "JUPITER/VENUS/SATURN", "JUPITER/VENUS/MERCURY",
-    "JUPITER/VENUS/KETHU", "JUPITER/SUN/SUN", "JUPITER/SUN/MOON", "JUPITER/SUN/MARS",
-    "JUPITER/SUN/RAHU", "SATURN/SUN/RAHU", "SATURN/SUN/JUPITER", "SATURN/SUN/SATURN",
-    "SATURN/SUN/MERCURY", "SATURN/SUN/KETHU", "SATURN/SUN/VENUS", "SATURN/MOON/MOON",
-    "SATURN/MOON/MARS", "SATURN/MOON/RAHU", "SATURN/MOON/JUPITER", "SATURN/MOON/SATURN",
-    "SATURN/MOON/MERCURY", "SATURN/MOON/KETHU", "SATURN/MOON/VENUS", "SATURN/MOON/SUN",
-    "SATURN/MARS/MARS", "SATURN/MARS/RAHU", "SATURN/MARS/JUPITER", "SATURN/MARS/SATURN",
-    "SATURN/MARS/MERCURY", "SATURN/MARS/KETHU", "SATURN/MARS/VENUS", "SATURN/MARS/SUN",
-    "SATURN/MARS/MOON", "SATURN/RAHU/RAHU", "SATURN/RAHU/JUPITER", "SATURN/RAHU/SATURN",
-    "SATURN/RAHU/MERCURY", "SATURN/RAHU/KETHU", "SATURN/RAHU/VENUS", "SATURN/RAHU/SUN",
-    "SATURN/RAHU/MOON", "SATURN/RAHU/MARS", "SATURN/JUPITER/JUPITER", "SATURN/JUPITER/SATURN",
-    "SATURN/JUPITER/MERCURY", "SATURN/JUPITER/KETHU", "SATURN/JUPITER/VENUS", "SATURN/JUPITER/SUN",
-    "SATURN/JUPITER/MOON", "JUPITER/JUPITER/MOON", "JUPITER/JUPITER/MARS", "JUPITER/JUPITER/RAHU",
-    "JUPITER/SATURN/SATURN", "JUPITER/SATURN/MERCURY", "JUPITER/SATURN/KETHU", "JUPITER/SATURN/VENUS",
-    "JUPITER/SATURN/SUN", "JUPITER/SATURN/MOON", "JUPITER/SATURN/MARS", "JUPITER/SATURN/RAHU",
-    "JUPITER/SATURN/JUPITER", "JUPITER/MERCURY/MERCURY", "JUPITER/MERCURY/KETHU", "JUPITER/MERCURY/VENUS",
-    "JUPITER/MERCURY/SUN", "JUPITER/MERCURY/MOON", "JUPITER/MERCURY/MARS", "JUPITER/MERCURY/RAHU",
-    "JUPITER/MERCURY/JUPITER", "JUPITER/MERCURY/SATURN", "MARS/KETHU/KETHU", "MARS/KETHU/VENUS",
-    "MARS/KETHU/SUN", "MARS/KETHU/MOON", "MARS/KETHU/MARS", "MARS/KETHU/RAHU", "MARS/KETHU/JUPITER",
-    "MARS/KETHU/SATURN", "MARS/KETHU/MERCURY", "MARS/VENUS/VENUS", "MARS/VENUS/SUN", "MARS/VENUS/MOON",
-    "MARS/VENUS/MARS", "MARS/VENUS/RAHU", "MARS/VENUS/JUPITER", "MARS/VENUS/SATURN", "MARS/VENUS/MERCURY",
-    "MARS/VENUS/KETHU", "MARS/SUN/SUN", "MARS/SUN/MOON", "MARS/SUN/MARS", "MARS/SUN/RAHU",
-    "VENUS/SUN/RAHU", "VENUS/SUN/JUPITER", "VENUS/SUN/SATURN", "VENUS/SUN/MERCURY", "VENUS/SUN/KETHU",
-    "VENUS/SUN/VENUS", "VENUS/MOON/MOON", "VENUS/MOON/MARS", "VENUS/MOON/RAHU", "VENUS/MOON/JUPITER",
-    "VENUS/MOON/SATURN", "VENUS/MOON/MERCURY", "VENUS/MOON/KETHU", "VENUS/MOON/VENUS", "VENUS/MOON/SUN",
-    "VENUS/MARS/MARS", "VENUS/MARS/RAHU", "VENUS/MARS/JUPITER", "VENUS/MARS/SATURN", "MERCURY/MARS/MERCURY",
-    "MERCURY/MARS/KETHU", "MERCURY/MARS/VENUS", "MERCURY/MARS/SUN", "MERCURY/MARS/MOON", "MERCURY/RAHU/RAHU",
-    "MERCURY/RAHU/JUPITER", "MERCURY/RAHU/SATURN", "MERCURY/RAHU/MERCURY", "MERCURY/RAHU/KETHU",
-    "MERCURY/RAHU/VENUS", "MERCURY/RAHU/SUN", "MERCURY/RAHU/MOON", "MERCURY/RAHU/MARS", "MERCURY/JUPITER/JUPITER",
-    "MERCURY/JUPITER/SATURN", "MERCURY/JUPITER/MERCURY", "MERCURY/JUPITER/KETHU", "MERCURY/JUPITER/VENUS",
-    "MERCURY/JUPITER/SUN", "MERCURY/JUPITER/MOON", "MOON/JUPITER/MOON", "MOON/JUPITER/MARS",
-    "MOON/JUPITER/RAHU", "MOON/SATURN/SATURN", "MOON/SATURN/MERCURY", "MOON/SATURN/KETHU",
-    "MOON/SATURN/VENUS", "MOON/SATURN/SUN", "MOON/SATURN/MOON", "MOON/SATURN/MARS", "MOON/SATURN/RAHU",
-    "MOON/SATURN/JUPITER", "MOON/MERCURY/MERCURY"
-]
+# --- Main deterministic generator ---
 
-# -------------------------------------------
-# 🌅 Generate Time Slots
-# -------------------------------------------
-def generate_time_slots(start_time, end_time, slot_minutes=144):
-    slots = []
-    current = start_time
-    while current < end_time:
-        next_time = current + timedelta(minutes=slot_minutes)
-        if next_time > end_time:
-            next_time = end_time
-        slots.append((current.time(), next_time.time()))
-        current = next_time
-    return slots
-
-# -------------------------------------------
-# 🪐 Generate Planetary Data for One Date
-# -------------------------------------------
-def generate_planetary_data_for_date(current_date, location):
-    rows = []
-    start_datetime = datetime.combine(current_date, datetime.strptime("00:01", "%H:%M").time())
-    end_datetime = datetime.combine(current_date, datetime.strptime("23:59", "%H:%M").time())
-    slots = generate_time_slots(start_datetime, end_datetime, slot_minutes=144)
-
-    for start_time, end_time in slots:
-        slot_seed = hash(f"{location}_{current_date}_{start_time}_{end_time}") % (10**8)
-        random.seed(slot_seed)
-
-        condition = random.choice(planetary_conditions)
-        stars = random.choice(list(level_map.keys()))
-        level = level_map[stars]
-        activity = random.choice(recommended_activities)
-        combination = random.choice(planetary_combinations)
-
-        rows.append({
-            "Date": current_date.strftime("%d-%m-%Y"),
-            "Day": current_date.strftime("%a"),
-            "Timing": f"{start_time.strftime('%I:%M %p')} - {end_time.strftime('%I:%M %p')}",
-            "Planetary_Condition": condition,
-            "Stars": stars,
-            "Level": level,
-            "Best_Planetary_Combination": combination,
-            "Recommended_Activity": activity,
-            "Location": location
-        })
-    return rows
-
-# -------------------------------------------
-# 📅 Generate Data for Multiple Dates
-# -------------------------------------------
 def generate_planetary_table(start_date, end_date, location):
-    data = []
-    if start_date == end_date:
-        data.extend(generate_planetary_data_for_date(start_date, location))
-    else:
-        current_date = start_date
-        while current_date <= end_date:
-            day_seed = hash(f"{location}_{current_date}") % (10**8)
-            random.seed(day_seed)
+    all_data = []
+    current_date = start_date
 
-            condition = random.choice(planetary_conditions)
-            stars = random.choice(list(level_map.keys()))
-            level = level_map[stars]
-            activity = random.choice(recommended_activities)
-            combination = random.choice(planetary_combinations)
+    while current_date <= end_date:
+        # Deterministic parameters
+        day_of_year = current_date.timetuple().tm_yday
+        loc_value = sum(ord(c) for c in location.lower())
+        angle = (day_of_year * 0.9856 + loc_value) % 360  # Earth-like orbital path
 
-            data.append({
+        # Calculate sunrise-like offset (approx)
+        base_hour, base_minute = time_from_angle(angle, base_hour=0, amplitude=90)
+        start_time = datetime.combine(current_date, datetime.min.time()) + timedelta(
+            hours=base_hour, minutes=base_minute
+        )
+
+        # 12 deterministic 2-hour slots
+        slot_duration = 120  # minutes
+        for i in range(12):
+            slot_start = start_time + timedelta(minutes=i * slot_duration)
+            slot_end = slot_start + timedelta(minutes=slot_duration - 1)
+
+            # Deterministic planetary data
+            cond_idx = deterministic_index(f"{location}_{current_date}_{i}_cond", len(planetary_conditions))
+            comb_idx = deterministic_index(f"{location}_{current_date}_{i}_combo", len(planetary_combinations))
+            act_idx = deterministic_index(f"{location}_{current_date}_{i}_act", len(recommended_activities))
+            star_count = (deterministic_index(f"{location}_{current_date}_{i}_stars", 5) + 1)
+
+            condition = planetary_conditions[cond_idx]
+            stars = "⭐" * star_count
+            level = level_map[star_count]
+            combination = planetary_combinations[comb_idx]
+            activity = recommended_activities[act_idx]
+
+            all_data.append({
                 "Date": current_date.strftime("%d-%m-%Y"),
                 "Day": current_date.strftime("%a"),
-                "Morning_Timing": "00:01 AM - 03:00 AM",
-                "Evening_Timing": "06:00 PM - 11:59 PM",
-                "Planetary_Condition": condition,
+                "Time Slot": f"{slot_start.strftime('%I:%M %p')} - {slot_end.strftime('%I:%M %p')}",
+                "Planetary Condition": condition,
                 "Stars": stars,
                 "Level": level,
-                "Best_Planetary_Combination": combination,
-                "Recommended_Activity": activity,
+                "Best Planetary Combination": combination,
+                "Recommended Activity": activity,
                 "Location": location
             })
-            current_date += timedelta(days=1)
-    return pd.DataFrame(data)
 
-# -------------------------------------------
-# 🎨 Streamlit UI
-# -------------------------------------------
-st.set_page_config(page_title="🔭 Planetary Energy Predictor", layout="wide")
-st.title("🔭 Planetary Energy Predictor")
-st.markdown("Predict planetary combinations, energy levels, and activities — location-based 🌍")
+        current_date += timedelta(days=1)
 
-col1, col2, col3 = st.columns(3)
-start_date = col1.date_input("Start Date", datetime.now().date())
-end_date = col2.date_input("End Date", datetime.now().date())
-location = col3.text_input("Enter Location (e.g., Chennai, London, New York)", "Chennai")
-
-if st.button("Generate Table"):
-    df = generate_planetary_table(start_date, end_date, location.strip().title())
-    st.dataframe(df, use_container_width=True)
-
-    csv = df.to_csv(index=False).encode("utf-8")
-    st.download_button(
-        "📥 Download CSV",
-        csv,
-        f"planetary_energy_{location}_{start_date}_to_{end_date}.csv",
-        "text/csv",
-        key="download-csv"
-    )
+    return pd.DataFrame(all_data)
