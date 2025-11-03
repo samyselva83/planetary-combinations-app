@@ -1,122 +1,91 @@
 import streamlit as st
+from datetime import datetime
+from itertools import permutations
 import pandas as pd
-from datetime import datetime, timedelta
-import pytz
-import random
+from astral import LocationInfo
+from astral.sun import sun
 
-# ------------------------------------------
-# LOCATION DATABASE (India + timezone info)
-# ------------------------------------------
-COUNTRY_LOCATIONS = {
-    "India - Chennai": ("Chennai", 13.0827, 80.2707, "Asia/Kolkata"),
-    "India - Madurai": ("Madurai", 9.9252, 78.1198, "Asia/Kolkata"),
-    "India - Coimbatore": ("Coimbatore", 11.0168, 76.9558, "Asia/Kolkata"),
-    "India - Bengaluru": ("Bengaluru", 12.9716, 77.5946, "Asia/Kolkata"),
-    "India - Hyderabad": ("Hyderabad", 17.3850, 78.4867, "Asia/Kolkata"),
-    "India - Kochi": ("Kochi", 9.9312, 76.2673, "Asia/Kolkata"),
-    "India - Mumbai": ("Mumbai", 19.0760, 72.8777, "Asia/Kolkata"),
-    "India - Delhi": ("Delhi", 28.6139, 77.2090, "Asia/Kolkata"),
-    "India - Kolkata": ("Kolkata", 22.5726, 88.3639, "Asia/Kolkata"),
-    "India - Jaipur": ("Jaipur", 26.9124, 75.7873, "Asia/Kolkata"),
+# --- Indian Cities ---
+INDIAN_CITIES = {
+    "Madurai": LocationInfo("Madurai", "India", "Asia/Kolkata", 9.9252, 78.1198),
+    "Chennai": LocationInfo("Chennai", "India", "Asia/Kolkata", 13.0827, 80.2707),
+    "Bangalore": LocationInfo("Bangalore", "India", "Asia/Kolkata", 12.9716, 77.5946),
+    "Mumbai": LocationInfo("Mumbai", "India", "Asia/Kolkata", 19.0760, 72.8777),
+    "Delhi": LocationInfo("Delhi", "India", "Asia/Kolkata", 28.6139, 77.2090),
+    "Hyderabad": LocationInfo("Hyderabad", "India", "Asia/Kolkata", 17.3850, 78.4867),
+    "Kolkata": LocationInfo("Kolkata", "India", "Asia/Kolkata", 22.5726, 88.3639),
+    "Coimbatore": LocationInfo("Coimbatore", "India", "Asia/Kolkata", 11.0168, 76.9558),
+    "Trichy": LocationInfo("Tiruchirappalli", "India", "Asia/Kolkata", 10.7905, 78.7047),
+    "Thiruvananthapuram": LocationInfo("Thiruvananthapuram", "India", "Asia/Kolkata", 8.5241, 76.9366),
 }
 
-# Planetary cycles used deterministically
-PLANETS = ["MOON", "MERCURY", "VENUS", "SUN", "MARS", "RAHU", "JUPITER", "SATURN", "KETHU"]
+PLANETS = ["SUN", "MOON", "MERCURY", "VENUS", "MARS", "JUPITER", "SATURN", "RAHU", "KETHU"]
 
-# Activity mapping (simplified for demo)
-ACTIVITY_MAP = {
-    "SUN": "Leadership / Focused Work",
-    "MOON": "Creative Work / Music",
-    "MARS": "Sports / Energy Tasks",
-    "MERCURY": "Communication / Writing",
-    "JUPITER": "Teaching / Strategy",
-    "VENUS": "Relationships / Art",
-    "SATURN": "Planning / Long-term work",
-    "RAHU": "Exploration / Research",
-    "KETHU": "Meditation / Spiritual",
-}
+st.set_page_config(page_title="🪐 Deterministic Astro Model", layout="wide", page_icon="🌞")
+st.title("🪐 Deterministic Planetary Combination Model")
 
-STAR_LEVELS = ["⭐", "⭐⭐", "⭐⭐⭐", "⭐⭐⭐⭐", "⭐⭐⭐⭐⭐"]
-LEVELS = ["Poor", "Average", "Good", "Very Good", "Excellent"]
+# --- Sidebar ---
+st.sidebar.header("Configuration")
+mode = st.sidebar.radio("Select Mode:", ["Single Date", "Multiple Dates"])
+city = st.sidebar.selectbox("Select City (India)", list(INDIAN_CITIES.keys()))
+selected_city = INDIAN_CITIES[city]
 
-# ------------------------------------------
-# Helper Functions
-# ------------------------------------------
+# --- Date Input ---
+if mode == "Single Date":
+    date = st.sidebar.date_input("Select a Date", datetime.now())
+else:
+    dates_input = st.sidebar.text_area(
+        "Enter multiple dates (comma separated, format: YYYY-MM-DD)",
+        "2024-10-01, 2024-12-25, 2025-03-21"
+    )
+    date_list = [d.strip() for d in dates_input.split(",") if d.strip()]
 
-def generate_planetary_combinations(date_obj, city):
-    """Deterministic combinations based on date and city coordinates"""
-    random.seed(f"{date_obj}-{city}")
-    combos = []
-    base_hour = 0
-    for i in range(9):
-        # Time window (3-hour slots approx)
-        start_time = (datetime.combine(date_obj, datetime.min.time()) + timedelta(hours=base_hour)).strftime("%I:%M %p")
-        end_time = (datetime.combine(date_obj, datetime.min.time()) + timedelta(hours=base_hour + 3)).strftime("%I:%M %p")
-        start_end = f"{start_time} - {end_time}"
-
-        # Deterministic planet order
-        first, second, third = random.sample(PLANETS, 3)
-        combo = f"{first}/{second}/{third}"
-
-        # Deterministic level
-        star_idx = (hash(f"{first}{second}{third}{date_obj}") % len(STAR_LEVELS))
-        stars = STAR_LEVELS[star_idx]
-        level = LEVELS[star_idx]
-
-        # Get activity
-        activity = ACTIVITY_MAP[first]
-
-        combos.append({
-            "Date": date_obj.strftime("%d-%m-%Y"),
-            "Time Slot": start_end,
-            "Planetary Combination": combo,
-            "Stars": stars,
-            "Level": level,
-            "Recommended Activity": activity
-        })
-        base_hour += 3
-
+# --- Generate All 3-planet Combinations ---
+def generate_combinations():
+    combos = ["/".join(p) for p in permutations(PLANETS, 3)]
     return combos
 
-# ------------------------------------------
-# Streamlit UI
-# ------------------------------------------
-st.set_page_config(page_title="Planetary Combination Predictor", layout="wide")
+def to_table_format(combos, cols=10):
+    # Split into equal columns
+    n_rows = (len(combos) + cols - 1) // cols
+    data = []
+    for i in range(n_rows):
+        row = combos[i*cols:(i+1)*cols]
+        row += [""] * (cols - len(row))  # pad with blanks
+        data.append(row)
+    col_names = [f"Col {i+1}" for i in range(cols)]
+    return pd.DataFrame(data, columns=col_names)
 
-st.title("🌌 Planetary Combination Predictor (Deterministic Model)")
+# --- Display for Single Date ---
+if mode == "Single Date":
+    st.subheader(f"📅 Planetary Combinations for {date.strftime('%d-%m-%Y')} ({city})")
+    suntime = sun(selected_city.observer, date=date)
+    st.write(f"**Sunrise:** {suntime['sunrise'].strftime('%H:%M')} | **Sunset:** {suntime['sunset'].strftime('%H:%M')}**")
 
-# Select city
-city_name = st.selectbox("Select City", list(COUNTRY_LOCATIONS.keys()))
-city, lat, lon, tz_str = COUNTRY_LOCATIONS[city_name]
-timezone = pytz.timezone(tz_str)
+    combos = generate_combinations()
+    df = to_table_format(combos, cols=10)
+    st.write(f"Total combinations generated: **{len(combos)}** (displayed in 10 columns)")
+    st.dataframe(df, use_container_width=True)
 
-# Single or multiple dates
-option = st.radio("Select Mode", ["Single Date", "Multiple Dates"], horizontal=True)
-
-if option == "Single Date":
-    date = st.date_input("Select Date", datetime.now().date())
-    if st.button("Generate"):
-        data = generate_planetary_combinations(date, city)
-        df = pd.DataFrame(data)
-        st.dataframe(df, use_container_width=True)
-        csv = df.to_csv(index=False).encode("utf-8")
-        st.download_button("Download CSV", csv, "planetary_data.csv", "text/csv")
+# --- Display for Multiple Dates ---
 else:
-    col1, col2 = st.columns(2)
-    with col1:
-        start_date = st.date_input("Start Date", datetime.now().date())
-    with col2:
-        end_date = st.date_input("End Date", datetime.now().date() + timedelta(days=3))
+    st.subheader(f"📅 Common Combinations Across Multiple Dates ({city})")
 
-    if st.button("Generate for Date Range"):
-        all_data = []
-        current_date = start_date
-        while current_date <= end_date:
-            daily_data = generate_planetary_combinations(current_date, city)
-            all_data.extend(daily_data)
-            current_date += timedelta(days=1)
+    date_combos = {}
+    for d in date_list:
+        try:
+            dt = datetime.strptime(d, "%Y-%m-%d")
+            date_combos[d] = set(generate_combinations())
+        except:
+            st.error(f"Invalid date format: {d}")
 
-        df = pd.DataFrame(all_data)
-        st.dataframe(df, use_container_width=True)
-        csv = df.to_csv(index=False).encode("utf-8")
-        st.download_button("Download CSV", csv, "planetary_range_data.csv", "text/csv")
+    if len(date_combos) > 1:
+        common = set.intersection(*date_combos.values())
+        st.success(f"Common combinations found across {len(date_combos)} dates: {len(common)}")
+        df_common = to_table_format(sorted(list(common)), cols=10)
+        st.dataframe(df_common, use_container_width=True)
+    else:
+        st.warning("Please enter at least two valid dates to compare.")
+
+st.markdown("---")
+st.caption("🪐 Deterministic Astro Model | Built with ❤️ using Streamlit")
