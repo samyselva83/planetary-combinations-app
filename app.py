@@ -55,14 +55,14 @@ def deterministic_planetary_data(country: str, city: str, start_date: datetime, 
         # Deterministic hash seed
         seed = abs(hash(f"{country}-{city}-{date_str}")) % 99999
 
-        # Deterministic index selection
+        # Deterministic values
         condition = PLANETARY_CONDITIONS[seed % len(PLANETARY_CONDITIONS)]
         stars = STARS[seed % len(STARS)]
         level = LEVELS[seed % len(LEVELS)]
         combo = PLANETARY_COMBINATIONS[seed % len(PLANETARY_COMBINATIONS)]
         activity = ACTIVITIES[seed % len(ACTIVITIES)]
 
-        # Deterministic morning/evening timings (slight variation per city)
+        # Deterministic timings
         base_shift = (seed % 60)
         morning_start = (datetime(date.year, date.month, date.day, 6, 0) + timedelta(minutes=base_shift)).strftime("%I:%M:%S %p")
         morning_end = (datetime(date.year, date.month, date.day, 7, 0) + timedelta(minutes=base_shift)).strftime("%I:%M:%S %p")
@@ -102,10 +102,14 @@ with col1:
 with col2:
     days = st.number_input("🗓️ Number of Days", min_value=1, max_value=60, value=10)
 
+# Show End Date
+end_date = (datetime.combine(start_date, datetime.min.time()) + timedelta(days=days - 1)).date()
+st.markdown(f"**🕒 End Date:** {end_date.strftime('%d-%m-%Y')}")
+
 # Generate button
 if st.button("🔮 Generate Planetary Schedule"):
     df = deterministic_planetary_data(country, city, datetime.combine(start_date, datetime.min.time()), days)
-    st.success(f"✅ Generated for {city}, {country} from {start_date.strftime('%d-%m-%Y')} for {days} days.")
+    st.success(f"✅ Generated schedule for **{city}, {country}** from **{start_date.strftime('%d-%m-%Y')}** to **{end_date.strftime('%d-%m-%Y')}** ({days} days).")
     st.dataframe(df, use_container_width=True)
 
     # Download CSV
