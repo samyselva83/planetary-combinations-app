@@ -1,144 +1,120 @@
-import streamlit as st
-import pandas as pd
+import csv
+import random
 from datetime import datetime, timedelta
-import pytz
 
-# ----------------------------
-# Country & City Mapping (internal)
-# ----------------------------
-LOCATION_DATA = {
-    "India": {
-        "timezone": "Asia/Kolkata",
-        "cities": ["Chennai", "Madurai", "Bangalore", "Hyderabad", "Mumbai", "Delhi", "Kolkata", "Coimbatore"]
-    },
-    "USA": {
-        "timezone": "America/New_York",
-        "cities": ["New York", "Los Angeles", "Chicago", "Houston", "San Francisco"]
-    },
-    "UK": {
-        "timezone": "Europe/London",
-        "cities": ["London", "Manchester", "Birmingham", "Liverpool"]
-    },
-    "Germany": {
-        "timezone": "Europe/Berlin",
-        "cities": ["Berlin", "Munich", "Hamburg", "Frankfurt"]
-    },
-    "France": {
-        "timezone": "Europe/Paris",
-        "cities": ["Paris", "Lyon", "Marseille", "Nice"]
-    },
-    "Japan": {
-        "timezone": "Asia/Tokyo",
-        "cities": ["Tokyo", "Osaka", "Kyoto", "Yokohama"]
-    },
-    "Australia": {
-        "timezone": "Australia/Sydney",
-        "cities": ["Sydney", "Melbourne", "Brisbane", "Perth"]
-    },
-    "Canada": {
-        "timezone": "America/Toronto",
-        "cities": ["Toronto", "Vancouver", "Montreal", "Ottawa"]
-    },
-    "Brazil": {
-        "timezone": "America/Sao_Paulo",
-        "cities": ["São Paulo", "Rio de Janeiro", "Brasília"]
-    },
-    "South Africa": {
-        "timezone": "Africa/Johannesburg",
-        "cities": ["Johannesburg", "Cape Town", "Durban"]
-    }
-}
+# ==========================================================
+#  CONFIGURABLE LISTS
+# ==========================================================
 
-# ----------------------------
-# Deterministic Planetary Data
-# ----------------------------
-PLANETARY_COMBINATIONS = [
-    "MOON/MERCURY/MERCURY", "MOON/MERCURY/KETHU", "MOON/MERCURY/VENUS", "MOON/MERCURY/SUN",
-    "MOON/MERCURY/MOON", "MOON/MERCURY/MARS", "MOON/MERCURY/RAHU", "MOON/MERCURY/JUPITER",
-    "MOON/MERCURY/SATURN", "SUN/KETHU/KETHU", "SUN/KETHU/VENUS", "SUN/KETHU/SUN", "SUN/KETHU/MOON",
-    "SUN/KETHU/MARS", "SUN/KETHU/RAHU", "SUN/KETHU/JUPITER", "SUN/KETHU/SATURN", "SUN/KETHU/MERCURY"
+# 🌍 Country list
+countries = [
+    "India", "USA", "UK", "France", "Germany",
+    "Japan", "Australia", "Canada", "Brazil", "South Africa"
 ]
 
-PLANETARY_DETAILS = {
-    "MOON": ("Moon Bright", "⭐⭐⭐", "Good", "Decision-making, teaching, mentoring"),
-    "SUN": ("Solar Radiance", "⭐⭐⭐⭐", "Excellent", "Leadership, motivation, clarity"),
-    "MERCURY": ("Mercury Calm", "⭐⭐", "Fair", "Communication, negotiation, analysis"),
-    "VENUS": ("Venus Harmony", "⭐⭐⭐⭐⭐", "Best", "Love, creativity, partnerships"),
-    "MARS": ("Mars Active", "⭐⭐⭐", "Good", "Energy, drive, competitive spirit"),
-    "JUPITER": ("Jupiter Wise", "⭐⭐⭐⭐", "Excellent", "Learning, teaching, spiritual pursuits"),
-    "SATURN": ("Saturn Focused", "⭐⭐", "Moderate", "Planning, persistence, discipline"),
-    "RAHU": ("Rahu Ambitious", "⭐⭐", "Mixed", "Innovation, risk-taking, growth"),
-    "KETHU": ("Kethu Detached", "⭐", "Challenging", "Spiritual growth, analysis"),
-}
+# 🏙️ City list (parallel mapping for demo purposes)
+cities = [
+    "Chennai", "New York", "London", "Paris", "Berlin",
+    "Tokyo", "Sydney", "Toronto", "São Paulo", "Cape Town"
+]
 
-# ----------------------------
-# Deterministic Report Generator
-# ----------------------------
-def generate_deterministic_report(start_date, end_date, country, city):
-    tz_info = LOCATION_DATA[country]["timezone"]
-    timezone = pytz.timezone(tz_info)
+# 🌠 Planetary combinations (from your data)
+planetary_combinations = [
+    "MOON/MERCURY/MERCURY", "MOON/MERCURY/KETHU", "MOON/MERCURY/VENUS",
+    "MOON/MERCURY/SUN", "MOON/MERCURY/MOON", "MOON/MERCURY/MARS",
+    "MOON/MERCURY/RAHU", "MOON/MERCURY/JUPITER", "MOON/MERCURY/SATURN",
+    "SUN/KETHU/KETHU", "SUN/KETHU/VENUS", "SUN/KETHU/SUN",
+    "SUN/KETHU/MOON", "SUN/KETHU/MARS", "SUN/KETHU/RAHU",
+    "SUN/KETHU/JUPITER", "SUN/KETHU/SATURN", "SUN/KETHU/MERCURY",
+    "SUN/VENUS/VENUS", "SUN/VENUS/SUN", "SUN/VENUS/MOON",
+    "SUN/VENUS/MARS", "SUN/VENUS/RAHU", "SUN/VENUS/JUPITER",
+    "SUN/VENUS/SATURN", "SUN/VENUS/MERCURY", "SUN/VENUS/KETHU",
+    "SUN/SUN/SUN", "SUN/SUN/MOON", "SUN/SUN/MARS", "SUN/SUN/RAHU"
+]
 
-    start = datetime.strptime(start_date, "%Y-%m-%d").astimezone(timezone)
-    end = datetime.strptime(end_date, "%Y-%m-%d").astimezone(timezone)
+# 🌟 Possible stars & levels
+stars = ["⭐⭐", "⭐⭐⭐", "⭐⭐⭐⭐"]
+levels = ["Average", "Good", "Excellent"]
 
-    delta = (end - start).days + 1
+# 🌙 Planetary conditions
+conditions = ["Moon Bright", "Moon Dim", "Sun Strong", "Planetary Balance"]
+
+# 🎯 Recommended activities
+activities = [
+    "Decision-making, teaching, mentoring",
+    "Travel, new beginnings, business planning",
+    "Meditation, creativity, reflection",
+    "Communication, collaboration, teamwork",
+    "Analysis, documentation, finance review"
+]
+
+# ==========================================================
+#  FUNCTION TO GENERATE DATA
+# ==========================================================
+
+def generate_planetary_table(start_date, days=10):
     rows = []
-
-    for i in range(delta):
-        date = start + timedelta(days=i)
+    
+    for i in range(days):
+        date = start_date + timedelta(days=i)
         date_str = date.strftime("%d-%m-%Y")
-        day_str = date.strftime("%a")
+        day = date.strftime("%a")
 
-        # Deterministic combination using date+city
-        seed = (hash(date_str + city + country) % len(PLANETARY_COMBINATIONS))
-        combination = PLANETARY_COMBINATIONS[seed]
-        main_planet = combination.split("/")[0]
-        condition, stars, level, activity = PLANETARY_DETAILS.get(main_planet, ("Unknown", "⭐", "Normal", "General activity"))
+        # Pick a random location
+        idx = i % len(countries)
+        country = countries[idx]
+        city = cities[idx]
 
-        # Timing
-        morning_start = datetime(date.year, date.month, date.day, 6, 0, 0).strftime("%I:%M:%S %p")
-        morning_end = datetime(date.year, date.month, date.day, 7, 0, 0).strftime("%I:%M:%S %p")
-        evening_start = datetime(date.year, date.month, date.day, 18, 0, 0).strftime("%I:%M:%S %p")
-        evening_end = datetime(date.year, date.month, date.day, 19, 0, 0).strftime("%I:%M:%S %p")
+        # Generate unique deterministic timings per date + city
+        base_seed = abs(hash(date_str + city)) % 30  # 0–29 minute shift
+        morning_shift = base_seed % 30
+        evening_shift = (base_seed * 2) % 30
 
+        morning_start = (datetime(date.year, date.month, date.day, 6, 0) + timedelta(minutes=morning_shift)).strftime("%I:%M:%S %p")
+        morning_end = (datetime(date.year, date.month, date.day, 7, 0) + timedelta(minutes=morning_shift)).strftime("%I:%M:%S %p")
+
+        evening_start = (datetime(date.year, date.month, date.day, 18, 0) + timedelta(minutes=evening_shift)).strftime("%I:%M:%S %p")
+        evening_end = (datetime(date.year, date.month, date.day, 19, 0) + timedelta(minutes=evening_shift)).strftime("%I:%M:%S %p")
+
+        # Pick other attributes randomly
+        condition = random.choice(conditions)
+        star = random.choice(stars)
+        level = random.choice(levels)
+        combo = random.choice(planetary_combinations)
+        activity = random.choice(activities)
+
+        # Add the row
         rows.append({
             "Date": date_str,
-            "Day": day_str,
+            "Day": day,
             "Country": country,
             "City": city,
             "Morning_Timing": f"{morning_start} - {morning_end}",
             "Evening_Timing": f"{evening_start} - {evening_end}",
             "Planetary_Condition": condition,
-            "Stars": stars,
+            "Stars": star,
             "Level": level,
-            "Best_Planetary_Combination": combination,
-            "Recommended_Activity": activity,
+            "Best_Planetary_Combination": combo,
+            "Recommended_Activity": activity
         })
+    
+    return rows
 
-    return pd.DataFrame(rows)
+# ==========================================================
+#  MAIN EXECUTION
+# ==========================================================
 
-# ----------------------------
-# Streamlit UI
-# ----------------------------
-st.set_page_config(page_title="Astro Day Report", layout="wide", page_icon="🌕")
-st.title("🌕 Deterministic Planetary Combination Report")
+if __name__ == "__main__":
+    start_date = datetime.strptime("03-11-2025", "%d-%m-%Y")
+    data = generate_planetary_table(start_date, days=10)
 
-col1, col2, col3, col4 = st.columns(4)
-with col1:
-    start_date = st.date_input("Start Date", datetime.today())
-with col2:
-    end_date = st.date_input("End Date", datetime.today() + timedelta(days=2))
-with col3:
-    country = st.selectbox("Select Country", list(LOCATION_DATA.keys()))
-with col4:
-    city = st.selectbox("Select City", LOCATION_DATA[country]["cities"])
+    # Save as CSV
+    filename = "planetary_schedule.csv"
+    with open(filename, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=data[0].keys())
+        writer.writeheader()
+        writer.writerows(data)
 
-if st.button("Generate Report"):
-    df = generate_deterministic_report(str(start_date), str(end_date), country, city)
-    st.dataframe(df, use_container_width=True)
-
-    csv = df.to_csv(index=False).encode("utf-8")
-    st.download_button("📥 Download as CSV", csv, f"{city}_Astro_Report.csv", "text/csv")
-
-st.markdown("---")
-st.caption("✨ Deterministic planetary combination report – consistent results based on date, country, and city.")
+    print(f"✅ Planetary schedule generated successfully: {filename}")
+    for row in data:
+        print(row)
