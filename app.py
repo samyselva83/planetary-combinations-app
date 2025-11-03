@@ -1,11 +1,18 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
-from astral import LocationInfo
-from astral.sun import sun
 import pytz
 import hashlib
-import math
+
+# ✅ Astral import handling for both v2 & v3
+try:
+    from astral import LocationInfo
+    from astral.sun import sun
+except ImportError:
+    from astral.geocoder import database, lookup
+    from astral.sun import sun
+    def LocationInfo(city_name):
+        return lookup(city_name, database())
 
 # ----------------------------------------------------
 # 🌍 Deterministic location-based planetary data model
@@ -59,9 +66,13 @@ def get_sun_times(location_name, date):
         loc = LocationInfo(location_name)
     except Exception:
         # fallback if location not found
-        loc = LocationInfo("Chennai", "India", "Asia/Kolkata", 13.0827, 80.2707)
+        loc = LocationInfo("Chennai")
 
-    tz = pytz.timezone(loc.timezone)
+    try:
+        tz = pytz.timezone(loc.timezone)
+    except:
+        tz = pytz.timezone("Asia/Kolkata")
+
     s = sun(loc.observer, date=date, tzinfo=tz)
     return s["sunrise"], s["sunset"]
 
