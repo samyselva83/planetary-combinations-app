@@ -1,141 +1,160 @@
+import streamlit as st
 import pandas as pd
+import random
 from datetime import datetime, timedelta
 
-# 🌙 Fixed planetary combination list for single-date generation
-FIXED_PLANETARY_LIST = [
-    "MOON/MERCURY/MERCURY", "MOON/MERCURY/KETHU", "MOON/MERCURY/VENUS", "MOON/MERCURY/SUN",
-    "MOON/MERCURY/MOON", "MOON/MERCURY/MARS", "MOON/MERCURY/RAHU", "MOON/MERCURY/JUPITER",
-    "MOON/MERCURY/SATURN", "SUN/KETHU/KETHU", "SUN/KETHU/VENUS", "SUN/KETHU/SUN",
-    "SUN/KETHU/MOON", "SUN/KETHU/MARS", "SUN/KETHU/RAHU", "SUN/KETHU/JUPITER",
-    "SUN/KETHU/SATURN", "SUN/KETHU/MERCURY", "SUN/VENUS/VENUS", "SUN/VENUS/SUN",
-    "SUN/VENUS/MOON", "SUN/VENUS/MARS", "SUN/VENUS/RAHU", "SUN/VENUS/JUPITER",
-    "SUN/VENUS/SATURN", "SUN/VENUS/MERCURY", "SUN/VENUS/KETHU", "SUN/SUN/SUN",
-    "SUN/SUN/MOON", "SUN/SUN/MARS", "SUN/SUN/RAHU", "MERCURY/SUN/RAHU", "MERCURY/SUN/JUPITER",
-    "MERCURY/SUN/SATURN", "MERCURY/SUN/MERCURY", "MERCURY/SUN/KETHU", "MERCURY/SUN/VENUS",
-    "MERCURY/MOON/MOON", "MERCURY/MOON/MARS", "MERCURY/MOON/RAHU", "MERCURY/MOON/JUPITER",
-    "MERCURY/MOON/SATURN", "MERCURY/MOON/MERCURY", "MERCURY/MOON/KETHU", "MERCURY/MOON/VENUS",
-    "MERCURY/MOON/SUN", "MERCURY/MARS/MARS", "MERCURY/MARS/RAHU", "MERCURY/MARS/JUPITER",
-    "MERCURY/MARS/SATURN", "VENUS/MARS/MERCURY", "VENUS/MARS/KETHU", "VENUS/MARS/VENUS",
-    "VENUS/MARS/SUN", "VENUS/MARS/MOON", "VENUS/RAHU/RAHU", "VENUS/RAHU/JUPITER",
-    "VENUS/RAHU/SATURN", "VENUS/RAHU/MERCURY", "VENUS/RAHU/KETHU", "VENUS/RAHU/VENUS",
-    "VENUS/RAHU/SUN", "VENUS/RAHU/MOON", "VENUS/RAHU/MARS", "VENUS/JUPITER/JUPITER",
-    "VENUS/JUPITER/SATURN", "VENUS/JUPITER/MERCURY", "VENUS/JUPITER/KETHU", "VENUS/JUPITER/VENUS",
-    "VENUS/JUPITER/SUN", "VENUS/JUPITER/MOON", "MARS/JUPITER/MOON", "MARS/JUPITER/MARS",
-    "MARS/JUPITER/RAHU", "MARS/SATURN/SATURN", "MARS/SATURN/MERCURY", "MARS/SATURN/KETHU",
-    "MARS/SATURN/VENUS", "MARS/SATURN/SUN", "MARS/SATURN/MOON", "MARS/SATURN/MARS",
-    "MARS/SATURN/RAHU", "MARS/SATURN/JUPITER", "MARS/MERCURY/MERCURY", "MARS/MERCURY/KETHU",
-    "MARS/MERCURY/VENUS", "MARS/MERCURY/SUN", "MARS/MERCURY/MOON", "MARS/MERCURY/MARS",
-    "MARS/MERCURY/RAHU", "MARS/MERCURY/JUPITER", "MARS/MERCURY/SATURN", "JUPITER/KETHU/KETHU",
-    "JUPITER/KETHU/VENUS", "JUPITER/KETHU/SUN", "JUPITER/KETHU/MOON", "JUPITER/KETHU/MARS",
-    "JUPITER/KETHU/RAHU", "JUPITER/KETHU/JUPITER", "JUPITER/KETHU/SATURN", "JUPITER/KETHU/MERCURY",
-    "JUPITER/VENUS/VENUS", "JUPITER/VENUS/SUN", "JUPITER/VENUS/MOON", "JUPITER/VENUS/MARS",
-    "JUPITER/VENUS/RAHU", "JUPITER/VENUS/JUPITER", "JUPITER/VENUS/SATURN", "JUPITER/VENUS/MERCURY",
-    "JUPITER/VENUS/KETHU", "JUPITER/SUN/SUN", "JUPITER/SUN/MOON", "JUPITER/SUN/MARS",
-    "JUPITER/SUN/RAHU", "SATURN/SUN/RAHU", "SATURN/SUN/JUPITER", "SATURN/SUN/SATURN",
-    "SATURN/SUN/MERCURY", "SATURN/SUN/KETHU", "SATURN/SUN/VENUS", "SATURN/MOON/MOON",
-    "SATURN/MOON/MARS", "SATURN/MOON/RAHU", "SATURN/MOON/JUPITER", "SATURN/MOON/SATURN",
-    "SATURN/MOON/MERCURY", "SATURN/MOON/KETHU", "SATURN/MOON/VENUS", "SATURN/MOON/SUN",
-    "SATURN/MARS/MARS", "SATURN/MARS/RAHU", "SATURN/MARS/JUPITER", "SATURN/MARS/SATURN",
-    "SATURN/MARS/MERCURY", "SATURN/MARS/KETHU", "SATURN/MARS/VENUS", "SATURN/MARS/SUN",
-    "SATURN/MARS/MOON", "SATURN/RAHU/RAHU", "SATURN/RAHU/JUPITER", "SATURN/RAHU/SATURN",
-    "SATURN/RAHU/MERCURY", "SATURN/RAHU/KETHU", "SATURN/RAHU/VENUS", "SATURN/RAHU/SUN",
-    "SATURN/RAHU/MOON", "SATURN/RAHU/MARS", "SATURN/JUPITER/JUPITER", "SATURN/JUPITER/SATURN",
-    "SATURN/JUPITER/MERCURY", "SATURN/JUPITER/KETHU", "SATURN/JUPITER/VENUS", "SATURN/JUPITER/SUN",
-    "SATURN/JUPITER/MOON", "JUPITER/JUPITER/MOON", "JUPITER/JUPITER/MARS", "JUPITER/JUPITER/RAHU",
-    "JUPITER/SATURN/SATURN", "JUPITER/SATURN/MERCURY", "JUPITER/SATURN/KETHU", "JUPITER/SATURN/VENUS",
-    "JUPITER/SATURN/SUN", "JUPITER/SATURN/MOON", "JUPITER/SATURN/MARS", "JUPITER/SATURN/RAHU",
-    "JUPITER/SATURN/JUPITER", "JUPITER/MERCURY/MERCURY", "JUPITER/MERCURY/KETHU", "JUPITER/MERCURY/VENUS",
-    "JUPITER/MERCURY/SUN", "JUPITER/MERCURY/MOON", "JUPITER/MERCURY/MARS", "JUPITER/MERCURY/RAHU",
-    "JUPITER/MERCURY/JUPITER", "JUPITER/MERCURY/SATURN", "MARS/KETHU/KETHU", "MARS/KETHU/VENUS",
-    "MARS/KETHU/SUN", "MARS/KETHU/MOON", "MARS/KETHU/MARS", "MARS/KETHU/RAHU", "MARS/KETHU/JUPITER",
-    "MARS/KETHU/SATURN", "MARS/KETHU/MERCURY", "MARS/VENUS/VENUS", "MARS/VENUS/SUN", "MARS/VENUS/MOON",
-    "MARS/VENUS/MARS", "MARS/VENUS/RAHU", "MARS/VENUS/JUPITER", "MARS/VENUS/SATURN", "MARS/VENUS/MERCURY",
-    "MARS/VENUS/KETHU", "MARS/SUN/SUN", "MARS/SUN/MOON", "MARS/SUN/MARS", "MARS/SUN/RAHU", "VENUS/SUN/RAHU",
-    "VENUS/SUN/JUPITER", "VENUS/SUN/SATURN", "VENUS/SUN/MERCURY", "VENUS/SUN/KETHU", "VENUS/SUN/VENUS",
-    "VENUS/MOON/MOON", "VENUS/MOON/MARS", "VENUS/MOON/RAHU", "VENUS/MOON/JUPITER", "VENUS/MOON/SATURN",
-    "VENUS/MOON/MERCURY", "VENUS/MOON/KETHU", "VENUS/MOON/VENUS", "VENUS/MOON/SUN", "VENUS/MARS/MARS",
-    "VENUS/MARS/RAHU", "VENUS/MARS/JUPITER", "VENUS/MARS/SATURN", "MERCURY/MARS/MERCURY",
-    "MERCURY/MARS/KETHU", "MERCURY/MARS/VENUS", "MERCURY/MARS/SUN", "MERCURY/MARS/MOON",
-    "MERCURY/RAHU/RAHU", "MERCURY/RAHU/JUPITER", "MERCURY/RAHU/SATURN", "MERCURY/RAHU/MERCURY",
-    "MERCURY/RAHU/KETHU", "MERCURY/RAHU/VENUS", "MERCURY/RAHU/SUN", "MERCURY/RAHU/MOON",
-    "MERCURY/RAHU/MARS", "MERCURY/JUPITER/JUPITER", "MERCURY/JUPITER/SATURN", "MERCURY/JUPITER/MERCURY",
-    "MERCURY/JUPITER/KETHU", "MERCURY/JUPITER/VENUS", "MERCURY/JUPITER/SUN", "MERCURY/JUPITER/MOON",
-    "MOON/JUPITER/MOON", "MOON/JUPITER/MARS", "MOON/JUPITER/RAHU", "MOON/SATURN/SATURN",
-    "MOON/SATURN/MERCURY", "MOON/SATURN/KETHU", "MOON/SATURN/VENUS", "MOON/SATURN/SUN",
-    "MOON/SATURN/MOON", "MOON/SATURN/MARS", "MOON/SATURN/RAHU", "MOON/SATURN/JUPITER", "MOON/MERCURY/MERCURY"
+# ------------------------------------------------------
+# 🌙 Page Setup
+# ------------------------------------------------------
+st.set_page_config(page_title="Planetary Movement Calendar", layout="wide")
+st.title("🪐 Planetary Movement & Activity Calendar")
+st.markdown(
+    """
+Generate realistic planetary movement timings and activities for any **single date** (detailed hourly sequence)
+or a **date range** (morning/evening summaries).
+No CSV upload required — all data is generated dynamically.
+"""
+)
+
+# ------------------------------------------------------
+# 🌍 Reference Data
+# ------------------------------------------------------
+planetary_conditions = [
+    "Moon Bright", "Sun Radiant", "Mercury Active",
+    "Jupiter Wise", "Venus Calm", "Mars Energetic", "Saturn Focused"
 ]
 
-# ⭐️ Deterministic mappings (same for all runs)
-STAR_MAP = {
-    "MOON": "⭐⭐⭐⭐",
-    "SUN": "⭐⭐⭐⭐⭐",
-    "MARS": "⭐⭐⭐",
-    "MERCURY": "⭐⭐⭐⭐",
-    "JUPITER": "⭐⭐⭐⭐⭐",
-    "VENUS": "⭐⭐⭐⭐",
-    "SATURN": "⭐⭐⭐",
-    "RAHU": "⭐⭐",
-    "KETHU": "⭐⭐"
+levels = ["Excellent", "Very Good", "Good", "Average", "Poor"]
+stars_map = {
+    "Excellent": "⭐⭐⭐⭐⭐",
+    "Very Good": "⭐⭐⭐⭐",
+    "Good": "⭐⭐⭐",
+    "Average": "⭐⭐",
+    "Poor": "⭐"
 }
+activities = [
+    "Decision-making, teaching, mentoring",
+    "Meditation, inner reflection, journaling",
+    "Creative work, writing, design",
+    "Leadership, presentations, meetings",
+    "Travel, communication, negotiation",
+    "Research, study, analysis",
+    "Relaxation, self-care, socializing"
+]
+weekday_map = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
-LEVEL_MAP = {
-    "⭐⭐⭐⭐⭐": "Excellent",
-    "⭐⭐⭐⭐": "Very Good",
-    "⭐⭐⭐": "Average",
-    "⭐⭐": "Challenging"
-}
+# Planetary combination list (you can expand further)
+planetary_combinations_full = [
+    "MOON/MERCURY/MERCURY","MOON/MERCURY/KETHU","MOON/MERCURY/VENUS","MOON/MERCURY/SUN",
+    "MOON/MERCURY/MOON","MOON/MERCURY/MARS","MOON/MERCURY/RAHU","MOON/MERCURY/JUPITER",
+    "MOON/MERCURY/SATURN","SUN/KETHU/KETHU","SUN/KETHU/VENUS","SUN/KETHU/SUN",
+    "SUN/KETHU/MOON","SUN/KETHU/MARS","SUN/KETHU/RAHU","SUN/KETHU/JUPITER",
+    "SUN/KETHU/SATURN","SUN/KETHU/MERCURY","SUN/VENUS/VENUS","SUN/VENUS/SUN",
+    "SUN/VENUS/MOON","SUN/VENUS/MARS","SUN/VENUS/RAHU","SUN/VENUS/JUPITER",
+    "SUN/VENUS/SATURN","SUN/VENUS/MERCURY","SUN/SUN/SUN","SUN/SUN/MOON",
+    "SUN/SUN/MARS","SUN/SUN/MERCURY","SUN/SUN/JUPITER","SUN/SUN/VENUS",
+    "SUN/SUN/SATURN","SUN/SUN/RAHU","SUN/SUN/KETHU"
+]
 
-ACTIVITY_MAP = {
-    "MOON": "Creative thinking or emotional healing.",
-    "SUN": "Leadership or decision making.",
-    "MARS": "Action, physical work, or competition.",
-    "MERCURY": "Communication, teaching, or analysis.",
-    "JUPITER": "Learning, teaching, or wisdom.",
-    "VENUS": "Art, beauty, and harmony activities.",
-    "SATURN": "Discipline, planning, or responsibility.",
-    "RAHU": "Innovation, tech work, or exploration.",
-    "KETHU": "Meditation, spirituality, or detachment."
-}
+# ------------------------------------------------------
+# 📅 Date Selection
+# ------------------------------------------------------
+col1, col2 = st.columns(2)
+with col1:
+    start_date = st.date_input("Select Start Date", datetime.now().date())
+with col2:
+    end_date = st.date_input("Select End Date", datetime.now().date())
 
-# 🌞 Generate planetary table
-def generate_planetary_table(start_date: str, end_date: str):
-    start = datetime.strptime(start_date, "%d-%m-%Y")
-    end = datetime.strptime(end_date, "%d-%m-%Y")
+# ------------------------------------------------------
+# 🕓 Helper Functions
+# ------------------------------------------------------
+def fmt_time(minutes):
+    """Convert total minutes into readable 12-hour time format."""
+    h = minutes // 60
+    m = minutes % 60
+    am_pm = "am" if h < 12 else "pm"
+    h = 12 if h == 0 else (h - 12 if h > 12 else h)
+    return f"{h:02d}:{m:02d}:00 {am_pm}"
 
-    if start == end:
-        # Single-date → fixed planetary list, full-day split
-        total_minutes = 24 * 60 - 1
-        step = total_minutes // len(FIXED_PLANETARY_LIST)
-        current_time = datetime.combine(start.date(), datetime.strptime("00:01", "%H:%M").time())
+# ------------------------------------------------------
+# 🌞 SINGLE-DATE DETAILED MODE
+# ------------------------------------------------------
+if start_date == end_date:
+    st.subheader(f"🌞 Full Planetary Movements — {start_date.strftime('%d-%m-%Y')}")
+    total_minutes = 24 * 60 - 1  # 00:01–23:59
+    num_segments = len(planetary_combinations_full)
+    step = total_minutes // num_segments
 
-        rows = []
-        for combo in FIXED_PLANETARY_LIST:
-            planet = combo.split("/")[-1]
-            start_time = current_time.strftime("%I:%M %p")
-            end_time = (current_time + timedelta(minutes=step)).strftime("%I:%M %p")
-            stars = STAR_MAP.get(planet, "⭐⭐⭐")
-            level = LEVEL_MAP[stars]
-            activity = ACTIVITY_MAP.get(planet, "General activities.")
+    rows = []
+    start_m = 1
 
-            rows.append([
-                start.strftime("%d-%m-%Y"), start.strftime("%a"),
-                f"{start_time} - {end_time}", f"{planet} Influence",
-                stars, level, combo, activity
-            ])
-            current_time += timedelta(minutes=step)
+    for combo in planetary_combinations_full:
+        end_m = min(start_m + step, total_minutes)
+        level = random.choice(levels)
+        stars = stars_map[level]
+        condition = random.choice(planetary_conditions)
+        activity = random.choice(activities)
 
-        df = pd.DataFrame(rows, columns=[
-            "Date", "Day", "Time Slot", "Planetary_Condition",
-            "Stars", "Level", "Planetary_Combination", "Recommended_Activity"
-        ])
-        df.to_csv("planetary_single_date.csv", index=False)
-        print("✅ Single-date planetary file saved as 'planetary_single_date.csv'")
+        rows.append({
+            "Date": start_date.strftime("%d-%m-%Y"),
+            "Day": weekday_map[start_date.weekday()],
+            "Morning_Timing": f"{fmt_time(start_m)} - {fmt_time(end_m)}",
+            "Evening_Timing": "",
+            "Planetary_Condition": condition,
+            "Stars": stars,
+            "Level": level,
+            "Best_Planetary_Combination": combo,
+            "Recommended_Activity": activity
+        })
+        start_m = end_m + 1
 
-    else:
-        # Multi-date → existing logic
-        print("🪐 Multiple dates selected — using dynamic logic (as before).")
-        # (You can reuse your multi-date dynamic function here.)
+    df = pd.DataFrame(rows)
+    st.dataframe(df, use_container_width=True, hide_index=True)
 
-# Example Usage:
-generate_planetary_table("03-11-2025", "03-11-2025")  # Single date example
-# generate_planetary_table("03-11-2025", "05-11-2025")  # Multi-date example
+    csv = df.to_csv(index=False).encode('utf-8')
+    st.download_button("📥 Download CSV", data=csv,
+                       file_name=f"planetary_movements_{start_date}.csv")
+
+# ------------------------------------------------------
+# 🪐 MULTI-DATE SUMMARY MODE
+# ------------------------------------------------------
+else:
+    st.subheader(f"📆 Planetary Overview — {start_date.strftime('%d-%m-%Y')} to {end_date.strftime('%d-%m-%Y')}")
+    current_date = start_date
+    rows = []
+
+    while current_date <= end_date:
+        # Randomize sunrise/sunset-based timings (approx realistic)
+        sunrise = random.randint(5, 6)
+        sunset = random.randint(17, 18)
+
+        morning_start = f"{sunrise:02d}:{random.randint(0,30):02d} am"
+        morning_end = f"{random.randint(8, 10):02d}:{random.randint(0,59):02d} am"
+        evening_start = f"{sunset:02d}:{random.randint(0,30):02d} pm"
+        evening_end = f"{random.randint(20, 22):02d}:{random.randint(0,59):02d} pm"
+
+        level = random.choice(levels)
+        stars = stars_map[level]
+        condition = random.choice(planetary_conditions)
+        activity = random.choice(activities)
+        combo = random.choice(planetary_combinations_full)
+
+        rows.append({
+            "Date": current_date.strftime("%d-%m-%Y"),
+            "Day": weekday_map[current_date.weekday()],
+            "Morning_Timing": f"{morning_start} - {morning_end}",
+            "Evening_Timing": f"{evening_start} - {evening_end}",
+            "Planetary_Condition": condition,
+            "Stars": stars,
+            "Level": level,
+            "Best_Planetary_Combination": combo,
+            "Recommended_Activity": activity
+        })
+        current_date += timedelta(days=1)
+
+    df = pd.DataFrame(rows)
+    st.dataframe(df, use_container_width=True, hide_index=True)
+
+    csv = df.to_csv(index=False).encode('utf-8')
+    st.download_button("📥 Download CSV", data=csv,
+                       file_name=f"planetary_summary_{start_date}_to_{end_date}.csv")
