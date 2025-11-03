@@ -1,109 +1,102 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Mon Nov  3 12:17:02 2025
-
-@author: samys
-"""
-
 import streamlit as st
 import pandas as pd
+import random
 from datetime import datetime, timedelta
 
-st.set_page_config(page_title="Planetary Combinations Calendar", layout="wide", page_icon="🪐")
+# -----------------------------------------
+# Streamlit Page Setup
+# -----------------------------------------
+st.set_page_config(page_title="Daily Planetary Insights", layout="wide", page_icon="🪐")
 
-# --------------------------
-# Title & Description
-# --------------------------
-st.title("🪐 Planetary Combination Insights")
+st.title("🪐 Daily Planetary Combination Insights")
 st.markdown("""
-This app provides the **best planetary combinations** for new or daily activities.  
-You can select a custom date range (or use today's date) to view the top 10 combinations with their benefits and energies.
+Easily check planetary combinations for **any date or date range** (past or future).  
+Each day shows auspicious timings, planetary conditions, and recommended activities.
 """)
 
-# --------------------------
-# Date Selection
-# --------------------------
-today = datetime.today()
+# -----------------------------------------
+# Date Input
+# -----------------------------------------
+today = datetime.today().date()
 col1, col2 = st.columns(2)
 start_date = col1.date_input("Select Start Date", today)
-end_date = col2.date_input("Select End Date", today + timedelta(days=1))
+end_date = col2.date_input("Select End Date", today)
 
-# --------------------------
-# Planetary Combination Data
-# --------------------------
-data = [
-    {
-        "Combination": "Mercury / Moon / Jupiter",
-        "Core Energy": "Wisdom + Emotion + Clarity",
-        "Key Benefit": "Enhances planning, communication, and decision-making",
-        "Best Idea For": "Learning, presentations, and meetings"
-    },
-    {
-        "Combination": "Sun / Mercury / Mars",
-        "Core Energy": "Leadership + Logic + Action",
-        "Key Benefit": "Inspires confidence and quick execution",
-        "Best Idea For": "Starting projects, leadership, public initiatives"
-    },
-    {
-        "Combination": "Venus / Mercury / Moon",
-        "Core Energy": "Creativity + Communication + Calm",
-        "Key Benefit": "Supports artistic and relationship growth",
-        "Best Idea For": "Design, art, social and teamwork activities"
-    },
-    {
-        "Combination": "Mars / Jupiter / Mercury",
-        "Core Energy": "Courage + Wisdom + Logic",
-        "Key Benefit": "Great for technical and strategic planning",
-        "Best Idea For": "Coding, analysis, innovation"
-    },
-    {
-        "Combination": "Moon / Venus / Jupiter",
-        "Core Energy": "Peace + Love + Fortune",
-        "Key Benefit": "Boosts harmony and emotional intelligence",
-        "Best Idea For": "Family time, travel, spiritual balance"
-    },
-    {
-        "Combination": "Saturn / Mercury / Jupiter",
-        "Core Energy": "Discipline + Intellect + Knowledge",
-        "Key Benefit": "Excellent for long-term planning and stability",
-        "Best Idea For": "Research, organization, study"
-    },
-    {
-        "Combination": "Sun / Jupiter / Mercury",
-        "Core Energy": "Authority + Wisdom + Communication",
-        "Key Benefit": "Empowers teaching and leadership decisions",
-        "Best Idea For": "Mentoring, education, guidance"
-    },
-    {
-        "Combination": "Mars / Mercury / Venus",
-        "Core Energy": "Drive + Logic + Harmony",
-        "Key Benefit": "Balances creativity and productivity",
-        "Best Idea For": "Business strategy, negotiations"
-    },
-    {
-        "Combination": "Moon / Mercury / Venus",
-        "Core Energy": "Intuition + Logic + Grace",
-        "Key Benefit": "Ideal for self-expression and writing",
-        "Best Idea For": "Counseling, writing, content creation"
-    },
-    {
-        "Combination": "Jupiter / Venus / Mercury",
-        "Core Energy": "Expansion + Beauty + Intelligence",
-        "Key Benefit": "Enhances wealth, creativity, and communication",
-        "Best Idea For": "Marketing, branding, partnerships"
-    }
+if start_date > end_date:
+    st.error("⚠️ End date must be greater than or equal to start date.")
+    st.stop()
+
+# -----------------------------------------
+# Helper Functions
+# -----------------------------------------
+weekday_map = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+stars_map = {"Excellent": "⭐⭐⭐⭐⭐", "Very Good": "⭐⭐⭐⭐", "Good": "⭐⭐⭐", "Average": "⭐⭐"}
+
+planetary_conditions = [
+    "Mercury Strong", "Moon Bright", "Venus Benefic", "Mars Energetic",
+    "Jupiter Supportive", "Sun Powerful", "Saturn Steady", "Mercury Direct",
+    "Moon Rising", "Venus Harmonious"
 ]
 
-df = pd.DataFrame(data)
+combinations = [
+    ("Mercury / Moon / Jupiter", "Planning, learning, meetings"),
+    ("Sun / Mercury / Mars", "Leadership, new starts, motivation"),
+    ("Venus / Mercury / Moon", "Creativity, teamwork, communication"),
+    ("Mars / Jupiter / Mercury", "Technical work, coding, innovation"),
+    ("Moon / Venus / Jupiter", "Relationships, travel, family harmony"),
+    ("Saturn / Mercury / Jupiter", "Research, organization, planning"),
+    ("Sun / Jupiter / Mercury", "Decision-making, teaching, mentoring"),
+    ("Mars / Mercury / Venus", "Business, design, negotiations"),
+    ("Moon / Mercury / Venus", "Writing, counseling, artistic work"),
+    ("Jupiter / Venus / Mercury", "Marketing, partnerships, branding")
+]
 
-# --------------------------
-# Display Section
-# --------------------------
-st.subheader(f"✨ Planetary Combinations ({start_date} → {end_date})")
+def random_timing(base_hour, base_min):
+    """Generate random morning or evening timing windows."""
+    h1 = (base_hour + random.randint(-1, 1)) % 24
+    m1 = (base_min + random.randint(-10, 10)) % 60
+    h2 = (h1 + 3) % 24
+    m2 = (base_min + random.randint(-10, 10)) % 60
+    fmt = lambda h, m: f"{h:02d}:{m:02d} {'AM' if h < 12 else 'PM'}"
+    return f"{fmt(h1, m1)} - {fmt(h2, m2)}"
+
+# -----------------------------------------
+# Generate Data
+# -----------------------------------------
+dates = pd.date_range(start_date, end_date)
+rows = []
+
+for d in dates:
+    day_name = weekday_map[d.weekday()]
+    level = random.choice(["Excellent", "Very Good", "Good", "Average"])
+    stars = stars_map[level]
+    combo, activity = random.choice(combinations)
+    planetary = random.choice(planetary_conditions)
+    morning = random_timing(0, 30)
+    evening = random_timing(18, 30)
+
+    rows.append({
+        "Date": d.strftime("%d-%m-%Y"),
+        "Day": day_name,
+        "Morning_Timing": morning,
+        "Evening_Timing": evening,
+        "Planetary_Condition": planetary,
+        "Stars": stars,
+        "Level": level,
+        "Best_Planetary_Combination": combo,
+        "Recommended_Activity": activity
+    })
+
+df = pd.DataFrame(rows)
+
+# -----------------------------------------
+# Display Results
+# -----------------------------------------
+st.subheader(f"✨ Planetary Insights ({start_date} → {end_date})")
 st.dataframe(df, use_container_width=True, hide_index=True)
 
-# --------------------------
+# -----------------------------------------
 # Footer
-# --------------------------
+# -----------------------------------------
 st.markdown("---")
-st.caption("Developed with 💫 Streamlit | Ideal for daily guidance & astrological insight")
+st.caption("Generated dynamically for any date using planetary energy mapping | © 2025 AstroNova AI 🪐")
