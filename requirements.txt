@@ -3,5 +3,6 @@ pandas
 numpy
 pytz
 skyfield
+astral
 
 
