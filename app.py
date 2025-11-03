@@ -20,7 +20,6 @@ recommended_activities = [
     "Physical exercise or travel"
 ]
 
-# Mapping star rating to level
 level_map = {
     "⭐": "Poor",
     "⭐⭐": "Average",
@@ -29,14 +28,17 @@ level_map = {
     "⭐⭐⭐⭐⭐": "Excellent"
 }
 
+planetary_combinations = [
+    "SUN/JUPITER/MERCURY", "MOON/MERCURY/MARS", "VENUS/SATURN/JUPITER",
+    "MARS/SUN/MERCURY", "MOON/MERCURY/KETHU", "MERCURY/VENUS/SUN",
+    "SATURN/JUPITER/MOON", "SUN/VENUS/MERCURY", "MOON/MARS/JUPITER",
+    "MERCURY/SUN/VENUS"
+]
 
 # -------------------------------------------
-# 🌅 Utility: Generate Time Slots for Single Day
+# 🌅 Generate Time Slots
 # -------------------------------------------
-def generate_time_slots(start_time, end_time, slot_minutes=41):
-    """
-    Generates time slots from start_time to end_time (inclusive) with slot_minutes duration
-    """
+def generate_time_slots(start_time, end_time, slot_minutes=144):
     slots = []
     current = start_time
     while current < end_time:
@@ -47,34 +49,25 @@ def generate_time_slots(start_time, end_time, slot_minutes=41):
         current = next_time
     return slots
 
-
 # -------------------------------------------
-# 🪐 Generate Planetary Data for Each Slot
+# 🪐 Generate Planetary Data for One Date
 # -------------------------------------------
-def generate_planetary_data_for_date(current_date):
+def generate_planetary_data_for_date(current_date, location):
     rows = []
     start_datetime = datetime.combine(current_date, datetime.strptime("00:01", "%H:%M").time())
     end_datetime = datetime.combine(current_date, datetime.strptime("23:59", "%H:%M").time())
-
-    # Create about 10 slots for the day
-    slots = generate_time_slots(start_datetime, end_datetime, slot_minutes=144)  # 24hr/10 = 144 mins
+    slots = generate_time_slots(start_datetime, end_datetime, slot_minutes=144)
 
     for i, (start_time, end_time) in enumerate(slots, start=1):
-        # Deterministic random seed per slot
-        slot_seed = hash(f"{current_date}_{start_time}_{end_time}") % (10**8)
+        # Deterministic seed for location + date + slot
+        slot_seed = hash(f"{location}_{current_date}_{start_time}_{end_time}") % (10**8)
         random.seed(slot_seed)
 
-        # Generate consistent values
         condition = random.choice(planetary_conditions)
         stars = random.choice(list(level_map.keys()))
         level = level_map[stars]
         activity = random.choice(recommended_activities)
-        combination = random.choice([
-            "SUN/JUPITER/MERCURY", "MOON/MERCURY/MARS", "VENUS/SATURN/JUPITER",
-            "MARS/SUN/MERCURY", "MOON/MERCURY/KETHU", "MERCURY/VENUS/SUN",
-            "SATURN/JUPITER/MOON", "SUN/VENUS/MERCURY", "MOON/MARS/JUPITER",
-            "MERCURY/SUN/VENUS"
-        ])
+        combination = random.choice(planetary_combinations)
 
         rows.append({
             "Date": current_date.strftime("%d-%m-%Y"),
@@ -85,76 +78,70 @@ def generate_planetary_data_for_date(current_date):
             "Stars": stars,
             "Level": level,
             "Best_Planetary_Combination": combination,
-            "Recommended_Activity": activity
+            "Recommended_Activity": activity,
+            "Location": location
         })
-
     return rows
 
-
 # -------------------------------------------
-# 📅 Generate Data for Single or Multiple Dates
+# 📅 Generate Data for Multiple Dates
 # -------------------------------------------
-def generate_planetary_table(start_date, end_date):
+def generate_planetary_table(start_date, end_date, location):
     data = []
 
     if start_date == end_date:
-        # Single-day detailed breakdown
-        current_date = start_date
-        data.extend(generate_planetary_data_for_date(current_date))
+        # Single day: full 24h sequence
+        data.extend(generate_planetary_data_for_date(start_date, location))
     else:
-        # Multi-day summary (one per date)
+        # Multi-day summary
         current_date = start_date
         while current_date <= end_date:
-            # Deterministic seed per day
-            day_seed = hash(str(current_date)) % (10**8)
+            day_seed = hash(f"{location}_{current_date}") % (10**8)
             random.seed(day_seed)
 
             condition = random.choice(planetary_conditions)
             stars = random.choice(list(level_map.keys()))
             level = level_map[stars]
             activity = random.choice(recommended_activities)
-            combination = random.choice([
-                "SUN/JUPITER/MERCURY", "MOON/MERCURY/MARS", "VENUS/SATURN/JUPITER",
-                "MARS/SUN/MERCURY", "MOON/MERCURY/KETHU", "MERCURY/VENUS/SUN",
-                "SATURN/JUPITER/MOON", "SUN/VENUS/MERCURY", "MOON/MARS/JUPITER",
-                "MERCURY/SUN/VENUS"
-            ])
+            combination = random.choice(planetary_combinations)
 
             data.append({
                 "Date": current_date.strftime("%d-%m-%Y"),
                 "Day": current_date.strftime("%a"),
-                "Morning_Timing": "00:27 AM - 03:41 AM",
-                "Evening_Timing": "18:40 PM - 22:54 PM",
+                "Morning_Timing": "00:01 AM - 03:00 AM",
+                "Evening_Timing": "18:00 PM - 23:59 PM",
                 "Planetary_Condition": condition,
                 "Stars": stars,
                 "Level": level,
                 "Best_Planetary_Combination": combination,
-                "Recommended_Activity": activity
+                "Recommended_Activity": activity,
+                "Location": location
             })
             current_date += timedelta(days=1)
 
     return pd.DataFrame(data)
 
-
 # -------------------------------------------
 # 🎨 Streamlit UI
 # -------------------------------------------
+st.set_page_config(page_title="🔭 Planetary Energy Predictor", layout="wide")
 st.title("🔭 Planetary Energy Predictor")
-st.markdown("Generate daily planetary movement & recommended activities table.")
+st.markdown("Predict planetary combinations, energy levels, and activities — now location-based 🌍")
 
-col1, col2 = st.columns(2)
+col1, col2, col3 = st.columns(3)
 start_date = col1.date_input("Start Date", datetime.now().date())
 end_date = col2.date_input("End Date", datetime.now().date())
+location = col3.text_input("Enter Location (e.g., Chennai, London, New York)", "Chennai")
 
 if st.button("Generate Table"):
-    df = generate_planetary_table(start_date, end_date)
+    df = generate_planetary_table(start_date, end_date, location.strip().title())
     st.dataframe(df, use_container_width=True)
 
     csv = df.to_csv(index=False).encode("utf-8")
     st.download_button(
         "📥 Download CSV",
         csv,
-        f"planetary_energy_{start_date}_to_{end_date}.csv",
+        f"planetary_energy_{location}_{start_date}_to_{end_date}.csv",
         "text/csv",
         key="download-csv"
     )
