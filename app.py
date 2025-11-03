@@ -1,120 +1,160 @@
 import streamlit as st
 import pandas as pd
+import random
 from datetime import datetime, timedelta
 
-# ----------------------------------------------------------
-# COUNTRY & CITY DATA (directly defined, not uploaded)
-# ----------------------------------------------------------
-COUNTRY_LOCATIONS = {
-    "India": ["Chennai", "Madurai", "Bangalore", "Mumbai", "Delhi"],
-    "USA": ["New York", "Los Angeles", "Chicago"],
-    "UK": ["London", "Manchester"],
-    "Japan": ["Tokyo", "Osaka"],
-    "France": ["Paris", "Lyon"]
+# ------------------------------------------------------
+# 🌙 Page Setup
+# ------------------------------------------------------
+st.set_page_config(page_title="Planetary Movement Calendar", layout="wide")
+st.title("🪐 Planetary Movement & Activity Calendar")
+st.markdown(
+    """
+Generate realistic planetary movement timings and activities for any **single date** (detailed hourly sequence)
+or a **date range** (morning/evening summaries).
+No CSV upload required — all data is generated dynamically.
+"""
+)
+
+# ------------------------------------------------------
+# 🌍 Reference Data
+# ------------------------------------------------------
+planetary_conditions = [
+    "Moon Bright", "Sun Radiant", "Mercury Active",
+    "Jupiter Wise", "Venus Calm", "Mars Energetic", "Saturn Focused"
+]
+
+levels = ["Excellent", "Very Good", "Good", "Average", "Poor"]
+stars_map = {
+    "Excellent": "⭐⭐⭐⭐⭐",
+    "Very Good": "⭐⭐⭐⭐",
+    "Good": "⭐⭐⭐",
+    "Average": "⭐⭐",
+    "Poor": "⭐"
 }
-
-# ----------------------------------------------------------
-# DETERMINISTIC PLANETARY COMBINATIONS
-# ----------------------------------------------------------
-PLANETARY_COMBINATIONS = [
-    "MOON/MERCURY/MERCURY", "MOON/MERCURY/KETHU", "MOON/MERCURY/VENUS",
-    "MOON/MERCURY/SUN", "MOON/MERCURY/MOON", "MOON/MERCURY/MARS",
-    "MOON/MERCURY/RAHU", "MOON/MERCURY/JUPITER", "MOON/MERCURY/SATURN",
-    "SUN/VENUS/SUN", "SUN/VENUS/MOON", "SUN/VENUS/MARS",
-    "MERCURY/MARS/MARS", "MERCURY/MARS/JUPITER", "MERCURY/MARS/SATURN",
-    "VENUS/RAHU/SATURN", "VENUS/RAHU/VENUS", "MARS/JUPITER/MOON",
-    "MARS/SATURN/SATURN", "MARS/SATURN/VENUS", "JUPITER/VENUS/SUN",
-    "SATURN/MOON/MOON", "SATURN/MARS/MARS", "SATURN/JUPITER/JUPITER"
-]
-
-# ----------------------------------------------------------
-# DETERMINISTIC CONDITIONS, STARS, LEVELS, ACTIVITIES
-# ----------------------------------------------------------
-PLANETARY_CONDITIONS = ["Moon Bright", "Sun Radiant", "Venus Calm", "Mars Energetic", "Saturn Focused", "Mercury Active"]
-STARS = ["⭐", "⭐⭐", "⭐⭐⭐", "⭐⭐⭐⭐", "⭐⭐⭐⭐⭐"]
-LEVELS = ["Poor", "Average", "Good", "Very Good", "Excellent"]
-ACTIVITIES = [
+activities = [
     "Decision-making, teaching, mentoring",
-    "Meditation, mindfulness, self-reflection",
-    "Research, analysis, and deep work",
-    "Creative work, music, or writing",
-    "Leadership, presentations, planning",
-    "Relaxation and family time"
+    "Meditation, inner reflection, journaling",
+    "Creative work, writing, design",
+    "Leadership, presentations, meetings",
+    "Travel, communication, negotiation",
+    "Research, study, analysis",
+    "Relaxation, self-care, socializing"
+]
+weekday_map = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+
+# Planetary combination list (you can expand further)
+planetary_combinations_full = [
+    "MOON/MERCURY/MERCURY","MOON/MERCURY/KETHU","MOON/MERCURY/VENUS","MOON/MERCURY/SUN",
+    "MOON/MERCURY/MOON","MOON/MERCURY/MARS","MOON/MERCURY/RAHU","MOON/MERCURY/JUPITER",
+    "MOON/MERCURY/SATURN","SUN/KETHU/KETHU","SUN/KETHU/VENUS","SUN/KETHU/SUN",
+    "SUN/KETHU/MOON","SUN/KETHU/MARS","SUN/KETHU/RAHU","SUN/KETHU/JUPITER",
+    "SUN/KETHU/SATURN","SUN/KETHU/MERCURY","SUN/VENUS/VENUS","SUN/VENUS/SUN",
+    "SUN/VENUS/MOON","SUN/VENUS/MARS","SUN/VENUS/RAHU","SUN/VENUS/JUPITER",
+    "SUN/VENUS/SATURN","SUN/VENUS/MERCURY","SUN/SUN/SUN","SUN/SUN/MOON",
+    "SUN/SUN/MARS","SUN/SUN/MERCURY","SUN/SUN/JUPITER","SUN/SUN/VENUS",
+    "SUN/SUN/SATURN","SUN/SUN/RAHU","SUN/SUN/KETHU"
 ]
 
-# ----------------------------------------------------------
-# FUNCTION: Generate deterministic planetary details
-# ----------------------------------------------------------
-def deterministic_planetary_data(country: str, city: str, start_date: datetime, days: int):
-    data = []
-    for i in range(days):
-        date = start_date + timedelta(days=i)
-        date_str = date.strftime("%d-%m-%Y")
-        day_str = date.strftime("%a")
+# ------------------------------------------------------
+# 📅 Date Selection
+# ------------------------------------------------------
+col1, col2 = st.columns(2)
+with col1:
+    start_date = st.date_input("Select Start Date", datetime.now().date())
+with col2:
+    end_date = st.date_input("Select End Date", datetime.now().date())
 
-        # Deterministic hash seed
-        seed = abs(hash(f"{country}-{city}-{date_str}")) % 99999
+# ------------------------------------------------------
+# 🕓 Helper Functions
+# ------------------------------------------------------
+def fmt_time(minutes):
+    """Convert total minutes into readable 12-hour time format."""
+    h = minutes // 60
+    m = minutes % 60
+    am_pm = "am" if h < 12 else "pm"
+    h = 12 if h == 0 else (h - 12 if h > 12 else h)
+    return f"{h:02d}:{m:02d}:00 {am_pm}"
 
-        # Deterministic values
-        condition = PLANETARY_CONDITIONS[seed % len(PLANETARY_CONDITIONS)]
-        stars = STARS[seed % len(STARS)]
-        level = LEVELS[seed % len(LEVELS)]
-        combo = PLANETARY_COMBINATIONS[seed % len(PLANETARY_COMBINATIONS)]
-        activity = ACTIVITIES[seed % len(ACTIVITIES)]
+# ------------------------------------------------------
+# 🌞 SINGLE-DATE DETAILED MODE
+# ------------------------------------------------------
+if start_date == end_date:
+    st.subheader(f"🌞 Full Planetary Movements — {start_date.strftime('%d-%m-%Y')}")
+    total_minutes = 24 * 60 - 1  # 00:01–23:59
+    num_segments = len(planetary_combinations_full)
+    step = total_minutes // num_segments
 
-        # Deterministic timings
-        base_shift = (seed % 60)
-        morning_start = (datetime(date.year, date.month, date.day, 6, 0) + timedelta(minutes=base_shift)).strftime("%I:%M:%S %p")
-        morning_end = (datetime(date.year, date.month, date.day, 7, 0) + timedelta(minutes=base_shift)).strftime("%I:%M:%S %p")
-        evening_start = (datetime(date.year, date.month, date.day, 18, 0) + timedelta(minutes=base_shift)).strftime("%I:%M:%S %p")
-        evening_end = (datetime(date.year, date.month, date.day, 19, 0) + timedelta(minutes=base_shift)).strftime("%I:%M:%S %p")
+    rows = []
+    start_m = 1
 
-        data.append({
-            "Date": date_str,
-            "Day": day_str,
+    for combo in planetary_combinations_full:
+        end_m = min(start_m + step, total_minutes)
+        level = random.choice(levels)
+        stars = stars_map[level]
+        condition = random.choice(planetary_conditions)
+        activity = random.choice(activities)
+
+        rows.append({
+            "Date": start_date.strftime("%d-%m-%Y"),
+            "Day": weekday_map[start_date.weekday()],
+            "Morning_Timing": f"{fmt_time(start_m)} - {fmt_time(end_m)}",
+            "Evening_Timing": "",
+            "Planetary_Condition": condition,
+            "Stars": stars,
+            "Level": level,
+            "Best_Planetary_Combination": combo,
+            "Recommended_Activity": activity
+        })
+        start_m = end_m + 1
+
+    df = pd.DataFrame(rows)
+    st.dataframe(df, use_container_width=True, hide_index=True)
+
+    csv = df.to_csv(index=False).encode('utf-8')
+    st.download_button("📥 Download CSV", data=csv,
+                       file_name=f"planetary_movements_{start_date}.csv")
+
+# ------------------------------------------------------
+# 🪐 MULTI-DATE SUMMARY MODE
+# ------------------------------------------------------
+else:
+    st.subheader(f"📆 Planetary Overview — {start_date.strftime('%d-%m-%Y')} to {end_date.strftime('%d-%m-%Y')}")
+    current_date = start_date
+    rows = []
+
+    while current_date <= end_date:
+        # Randomize sunrise/sunset-based timings (approx realistic)
+        sunrise = random.randint(5, 6)
+        sunset = random.randint(17, 18)
+
+        morning_start = f"{sunrise:02d}:{random.randint(0,30):02d} am"
+        morning_end = f"{random.randint(8, 10):02d}:{random.randint(0,59):02d} am"
+        evening_start = f"{sunset:02d}:{random.randint(0,30):02d} pm"
+        evening_end = f"{random.randint(20, 22):02d}:{random.randint(0,59):02d} pm"
+
+        level = random.choice(levels)
+        stars = stars_map[level]
+        condition = random.choice(planetary_conditions)
+        activity = random.choice(activities)
+        combo = random.choice(planetary_combinations_full)
+
+        rows.append({
+            "Date": current_date.strftime("%d-%m-%Y"),
+            "Day": weekday_map[current_date.weekday()],
             "Morning_Timing": f"{morning_start} - {morning_end}",
             "Evening_Timing": f"{evening_start} - {evening_end}",
             "Planetary_Condition": condition,
             "Stars": stars,
             "Level": level,
             "Best_Planetary_Combination": combo,
-            "Recommended_Activity": activity,
-            "Country": country,
-            "City": city
+            "Recommended_Activity": activity
         })
-    return pd.DataFrame(data)
+        current_date += timedelta(days=1)
 
-# ----------------------------------------------------------
-# STREAMLIT UI
-# ----------------------------------------------------------
-st.set_page_config(page_title="🪐 Deterministic Planetary Generator", layout="wide")
-st.title("🌌 Deterministic Planetary Combination Generator")
-st.markdown("Generate consistent planetary insights based on **location** and **date** — no randomness, fully reproducible.")
+    df = pd.DataFrame(rows)
+    st.dataframe(df, use_container_width=True, hide_index=True)
 
-# Country & City selection
-country = st.selectbox("🌍 Select Country", list(COUNTRY_LOCATIONS.keys()))
-city = st.selectbox("🏙️ Select City", COUNTRY_LOCATIONS[country])
-
-# Date & duration
-col1, col2 = st.columns(2)
-with col1:
-    start_date = st.date_input("📅 Start Date", datetime(2025, 11, 3))
-with col2:
-    days = st.number_input("🗓️ Number of Days", min_value=1, max_value=60, value=10)
-
-# Show End Date
-end_date = (datetime.combine(start_date, datetime.min.time()) + timedelta(days=days - 1)).date()
-st.markdown(f"**🕒 End Date:** {end_date.strftime('%d-%m-%Y')}")
-
-# Generate button
-if st.button("🔮 Generate Planetary Schedule"):
-    df = deterministic_planetary_data(country, city, datetime.combine(start_date, datetime.min.time()), days)
-    st.success(f"✅ Generated schedule for **{city}, {country}** from **{start_date.strftime('%d-%m-%Y')}** to **{end_date.strftime('%d-%m-%Y')}** ({days} days).")
-    st.dataframe(df, use_container_width=True)
-
-    # Download CSV
-    csv = df.to_csv(index=False).encode("utf-8")
-    st.download_button("📥 Download CSV", csv, "planetary_schedule.csv", "text/csv")
-
-st.markdown("---")
-st.caption("✨ Generated by Smart Agent — Deterministic Planetary AI ✨")
+    csv = df.to_csv(index=False).encode('utf-8')
+    st.download_button("📥 Download CSV", data=csv,
+                       file_name=f"planetary_summary_{start_date}_to_{end_date}.csv")
