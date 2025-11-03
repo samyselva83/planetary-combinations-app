@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 # -----------------------------------------
 # Streamlit Page Setup
 # -----------------------------------------
-st.set_page_config(page_title="Daily Planetary Insights", layout="wide", page_icon="🪐")
+st.set_page_config(page_title="Daily Planetary Combination Insights", layout="wide", page_icon="🪐")
 
 st.title("🪐 Daily Planetary Combination Insights")
 st.markdown("""
@@ -27,7 +27,7 @@ if start_date > end_date:
     st.stop()
 
 # -----------------------------------------
-# Helper Functions
+# Data Setup
 # -----------------------------------------
 weekday_map = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 stars_map = {"Excellent": "⭐⭐⭐⭐⭐", "Very Good": "⭐⭐⭐⭐", "Good": "⭐⭐⭐", "Average": "⭐⭐"}
@@ -52,7 +52,7 @@ combinations = [
 ]
 
 def random_timing(base_hour, base_min):
-    """Generate random morning or evening timing windows."""
+    """Generate random timing windows."""
     h1 = (base_hour + random.randint(-1, 1)) % 24
     m1 = (base_min + random.randint(-10, 10)) % 60
     h2 = (h1 + 3) % 24
@@ -61,10 +61,10 @@ def random_timing(base_hour, base_min):
     return f"{fmt(h1, m1)} - {fmt(h2, m2)}"
 
 # -----------------------------------------
-# Generate Data
+# Generate Planetary Data
 # -----------------------------------------
-dates = pd.date_range(start_date, end_date)
 rows = []
+dates = pd.date_range(start_date, end_date)
 
 for d in dates:
     day_name = weekday_map[d.weekday()]
@@ -72,8 +72,14 @@ for d in dates:
     stars = stars_map[level]
     combo, activity = random.choice(combinations)
     planetary = random.choice(planetary_conditions)
-    morning = random_timing(0, 30)
-    evening = random_timing(18, 30)
+
+    # For single date selection (full day coverage)
+    if start_date == end_date:
+        morning = "00:01 AM"
+        evening = "23:59 PM"
+    else:
+        morning = random_timing(0, 30)
+        evening = random_timing(18, 30)
 
     rows.append({
         "Date": d.strftime("%d-%m-%Y"),
@@ -90,9 +96,13 @@ for d in dates:
 df = pd.DataFrame(rows)
 
 # -----------------------------------------
-# Display Results
+# Display Section
 # -----------------------------------------
-st.subheader(f"✨ Planetary Insights ({start_date} → {end_date})")
+if start_date == end_date:
+    st.subheader(f"🌞 Planetary Insights for {start_date.strftime('%d-%m-%Y')}")
+else:
+    st.subheader(f"✨ Planetary Insights ({start_date} → {end_date})")
+
 st.dataframe(df, use_container_width=True, hide_index=True)
 
 # -----------------------------------------
