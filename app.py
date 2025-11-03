@@ -1,24 +1,21 @@
-import csv
+import streamlit as st
 import random
 from datetime import datetime, timedelta
+import pandas as pd
 
 # ==========================================================
 #  CONFIGURABLE LISTS
 # ==========================================================
-
-# 🌍 Country list
 countries = [
     "India", "USA", "UK", "France", "Germany",
     "Japan", "Australia", "Canada", "Brazil", "South Africa"
 ]
 
-# 🏙️ City list (parallel mapping for demo purposes)
 cities = [
     "Chennai", "New York", "London", "Paris", "Berlin",
     "Tokyo", "Sydney", "Toronto", "São Paulo", "Cape Town"
 ]
 
-# 🌠 Planetary combinations (from your data)
 planetary_combinations = [
     "MOON/MERCURY/MERCURY", "MOON/MERCURY/KETHU", "MOON/MERCURY/VENUS",
     "MOON/MERCURY/SUN", "MOON/MERCURY/MOON", "MOON/MERCURY/MARS",
@@ -32,14 +29,9 @@ planetary_combinations = [
     "SUN/SUN/SUN", "SUN/SUN/MOON", "SUN/SUN/MARS", "SUN/SUN/RAHU"
 ]
 
-# 🌟 Possible stars & levels
 stars = ["⭐⭐", "⭐⭐⭐", "⭐⭐⭐⭐"]
 levels = ["Average", "Good", "Excellent"]
-
-# 🌙 Planetary conditions
 conditions = ["Moon Bright", "Moon Dim", "Sun Strong", "Planetary Balance"]
-
-# 🎯 Recommended activities
 activities = [
     "Decision-making, teaching, mentoring",
     "Travel, new beginnings, business planning",
@@ -51,22 +43,19 @@ activities = [
 # ==========================================================
 #  FUNCTION TO GENERATE DATA
 # ==========================================================
-
 def generate_planetary_table(start_date, days=10):
     rows = []
-    
     for i in range(days):
         date = start_date + timedelta(days=i)
         date_str = date.strftime("%d-%m-%Y")
         day = date.strftime("%a")
 
-        # Pick a random location
         idx = i % len(countries)
         country = countries[idx]
         city = cities[idx]
 
-        # Generate unique deterministic timings per date + city
-        base_seed = abs(hash(date_str + city)) % 30  # 0–29 minute shift
+        # Deterministic but unique timing per city/date
+        base_seed = abs(hash(date_str + city)) % 30
         morning_shift = base_seed % 30
         evening_shift = (base_seed * 2) % 30
 
@@ -76,14 +65,6 @@ def generate_planetary_table(start_date, days=10):
         evening_start = (datetime(date.year, date.month, date.day, 18, 0) + timedelta(minutes=evening_shift)).strftime("%I:%M:%S %p")
         evening_end = (datetime(date.year, date.month, date.day, 19, 0) + timedelta(minutes=evening_shift)).strftime("%I:%M:%S %p")
 
-        # Pick other attributes randomly
-        condition = random.choice(conditions)
-        star = random.choice(stars)
-        level = random.choice(levels)
-        combo = random.choice(planetary_combinations)
-        activity = random.choice(activities)
-
-        # Add the row
         rows.append({
             "Date": date_str,
             "Day": day,
@@ -91,30 +72,45 @@ def generate_planetary_table(start_date, days=10):
             "City": city,
             "Morning_Timing": f"{morning_start} - {morning_end}",
             "Evening_Timing": f"{evening_start} - {evening_end}",
-            "Planetary_Condition": condition,
-            "Stars": star,
-            "Level": level,
-            "Best_Planetary_Combination": combo,
-            "Recommended_Activity": activity
+            "Planetary_Condition": random.choice(conditions),
+            "Stars": random.choice(stars),
+            "Level": random.choice(levels),
+            "Best_Planetary_Combination": random.choice(planetary_combinations),
+            "Recommended_Activity": random.choice(activities)
         })
+    return pd.DataFrame(rows)
+
+# ==========================================================
+#  STREAMLIT UI
+# ==========================================================
+st.set_page_config(page_title="🌙 Planetary Combinations", layout="wide")
+
+st.title("🌟 Planetary Combination Generator")
+st.write("Generate deterministic planetary schedules by location and date.")
+
+# Input fields
+col1, col2 = st.columns(2)
+with col1:
+    start_date = st.date_input("Select start date", datetime(2025, 11, 3))
+with col2:
+    days = st.number_input("Number of days", min_value=1, max_value=365, value=10)
+
+# Generate button
+if st.button("Generate Planetary Schedule"):
+    df = generate_planetary_table(start_date=datetime.combine(start_date, datetime.min.time()), days=days)
     
-    return rows
+    st.success(f"✅ Generated planetary schedule for {days} days starting from {start_date.strftime('%d-%m-%Y')}")
+    st.dataframe(df, use_container_width=True)
 
-# ==========================================================
-#  MAIN EXECUTION
-# ==========================================================
+    # Download option
+    csv = df.to_csv(index=False).encode('utf-8')
+    st.download_button(
+        label="📥 Download CSV",
+        data=csv,
+        file_name="planetary_schedule.csv",
+        mime="text/csv"
+    )
 
-if __name__ == "__main__":
-    start_date = datetime.strptime("03-11-2025", "%d-%m-%Y")
-    data = generate_planetary_table(start_date, days=10)
+st.markdown("---")
+st.caption("Created by Smart Agent AI 🔮")
 
-    # Save as CSV
-    filename = "planetary_schedule.csv"
-    with open(filename, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=data[0].keys())
-        writer.writeheader()
-        writer.writerows(data)
-
-    print(f"✅ Planetary schedule generated successfully: {filename}")
-    for row in data:
-        print(row)
